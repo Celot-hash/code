@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh_CN">
+<head>
+    <meta charset="UTF-8">
+    <title>在线代码编辑器</title>
+    <link rel="icon" href="../static/img/codepen.png" type ="image/x-icon">
+    <script src="../static/js/jquery-3.4.1.min.js"></script>
+    <script src="../static/js/bootstrap.js"></script>
+    <script src="../static/js/codemirror.js"></script>
+    <script src="../static/model/clike.js"></script>
+    <script src="../static/js/show-hint.js"></script>
+    <script src="../static/js/react.development.js"></script>
+    <script src="../static/js/react-dom.development.js"></script>
+    <script src="../static/js/babel.min.js"></script>
+    <script src="https://unpkg.com/react-bootstrap@next/dist/react-bootstrap.min.js" crossorigin></script>
+    <link rel="stylesheet" href="../static/css/show-hint.css">
+    <link rel="stylesheet" href="../static/css/bootstrap.css">
+    <link rel="stylesheet" href="../static/css/codemirror.css">
+    <link rel="stylesheet" href="../static/css/style.css">
+    <script type="text/babel">
+        //标题栏
+        const navCss = {
+            fontSize: "30px",
+            color: 'black'
+        }
+
+        const navInner = {
+            width:"40px",
+            height:"40px"
+
+        }
+        const navImg={
+            width:"40px",
+            height:"40px"
+        }
+
+        ReactDOM.render(
+            <div>
+                <nav className="navbar navbar-expand-lg navbar-light bg-light" style={navCss}>
+                    <a className="navbar-brand"><img src="static/img/codepen.png" style={navImg}/></a>
+                    <a className="navbar-brand" style={navInner}>在线代码编辑器</a>
+
+                </nav>
+            </div>,
+            document.getElementById('navigation')
+        )
+
+
+        //下载文件组件
+        class Download extends React.Component {
+            downloadFile = () => {
+                const text = codeMirror.getValue();
+                const blob = new Blob([text], {type: "text/plain"});
+                // 创建a标签
+                const a = document.createElement("a");
+                // 设置下载文件的文件名
+                a.download = "my_code.txt";
+                // 设置下载文件url
+                a.href = window.URL.createObjectURL(blob);
+                a.target = "_blank"
+                a.style.display = "none"
+                document.body.appendChild(a)
+                a.click();
+                document.body.removeChild(a);
+                // 设置点击事件
+            }
+
+            render() {
+                return (
+                    <button id="execute-btn" class="btn btn-primary" onClick={this.downloadFile} style={{marginTop: '10px',}}>下载代码</button>
+                )
+            }
+        }
+        ReactDOM.render(<Download />, document.getElementById('download'));
+
+
+        //说明
+        ReactDOM.render(
+            <h2 style={{marginTop: '10px',}} className="text-center">请在编辑框中输入代码</h2>,document.getElementById('header')
+        )
+
+        //页脚
+        const Footer = () => {
+            const footer = {
+                padding: '20px',
+                backgroundColor: '#b9e7e7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                height: '40px',
+                width: '100%',
+                position: "fixed",
+                bottom: '0'
+            }
+            return (
+                <footer style={footer}>
+                    <span>在线代码编辑器</span>
+                    <span>Made by Zjq</span>
+                </footer>
+            )
+        }
+        ReactDOM.render(<Footer />, document.getElementById('footer'));
+    </script>
+
+
+    <script type="text/babel">
+        const defaultCode = "public class Test {\n" +
+            "   public static void main(String[] arg) {\n" +
+            "       System.out.print(\"hello world!\");\n"+
+            "   }\n" +
+            "}";
+        const codeMirror = CodeMirror(document.getElementById("code-editor"), {
+            value: defaultCode,
+            lineNumbers: true,
+            mode: "text/x-java",
+            allowDropFileTypes: ['text/plain'],
+            matchBrackets: true,
+            completeSingle: false,
+        });
+        codeMirror.on('keypress', function () {
+            codeMirror.showHint();
+        });
+        function runCode() {
+            $("#success").hide();
+            $("#fail").hide();
+            const value = codeMirror.getValue();
+            $.post("/run_code", {code: value}, data => {
+                $("#execute-btn").removeAttr("data-target").removeAttr("aria-controls");
+                if (data.code === 200) {
+                    if (data.results.compiled) {
+                        $("#success").show();
+                        $("#results").html(data.results.stdout);
+                    } else {
+                        $("#fail").show();
+                        let errorMessage = "";
+                        data.results.errorMessage.forEach(message => {
+                            errorMessage += message + "<br>";
+                        });
+                        $("#results").html(errorMessage);
+                    }
+                } else {
+                    $("#fail").show();
+                    $("#success").hide();
+                }
+            });
+        }
+
+        //清空已经输入的代码
+        function clearCode() {
+            codeMirror.setValue("");
+        }
+
+    </script>
+</head>
+<body style="background: #c6c8ca;">
+    <nav id="navigation"></nav>
+    <div id="download" style="margin-left: 85%"></div>
+    <div id="header"></div>
+    <div id="code"></div>
+
+    <div class="m-auto div-shadow shadow p-3 mb-5 bg-white rounded">
+        <div id="code-editor" style="align-content: center">
+
+        </div>
+    </div>
+
+    <div style="margin-top: 30px !important; width: 800px" class="m-auto">
+        <button id="execute-btn" type="button" class="btn btn-primary" data-toggle="collapse"
+                data-target="#results-container" aria-expanded="false"
+                aria-controls="results-container" onclick="runCode()">执行代码
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="clearCode()">清空代码</button>
+    </div>
+    <div style="margin-top: 10px !important; width: 800px" class="m-auto collapse" id="results-container">
+        <div class="card card-body">
+            <p>执行结果：
+                <span id="success" class="alert alert-success alert-span">成功</span>
+                <span id="fail" class="alert alert-danger alert-span">编译错误</span>
+            </p>
+            <p id="results"></p>
+        </div>
+    </div>
+
+    <div id="footer"></div>
+
+
+</body>
+</html>
